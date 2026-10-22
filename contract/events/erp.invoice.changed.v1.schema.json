@@ -1,0 +1,294 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brickkit.dev/erp-billing/events/erp.invoice.changed.v1.schema.json",
+  "title": "erp.invoice.changed.v1",
+  "description": "An invoice (a full-state event); the record ID is its UUIDv7 and also the claim ID at the source. Also the data of InvoiceService.Read.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "number",
+    "legal_entity_id",
+    "customer",
+    "currency",
+    "exchange_rate",
+    "source",
+    "state",
+    "formalization",
+    "invoice_date",
+    "lines",
+    "totals",
+    "print",
+    "version",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "number": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "INV-<legal entity code>-<year>-<six digits>; null until issued"
+    },
+    "legal_entity_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "customer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "partner_id",
+        "name",
+        "tax_id"
+      ],
+      "properties": {
+        "partner_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "name": {
+          "type": "string"
+        },
+        "tax_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "exchange_rate": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rate",
+            "date",
+            "type"
+          ],
+          "properties": {
+            "rate": {
+              "type": "string",
+              "pattern": "^[0-9]+(\\.[0-9]+)?$",
+              "description": "a non-negative decimal string"
+            },
+            "date": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "the order's snapshot; null in the legal entity's currency"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "sales_order"
+          ],
+          "description": "later: project milestone, contract period"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "state": {
+      "enum": [
+        "draft",
+        "confirmed",
+        "issued",
+        "void"
+      ]
+    },
+    "formalization": {
+      "enum": [
+        "none",
+        "pending",
+        "done"
+      ],
+      "description": "issued: whether the source has recorded it as billed"
+    },
+    "invoice_date": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "date",
+      "description": "the business date of the numbering transaction"
+    },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "line_no",
+          "source_line_id",
+          "product",
+          "quantity",
+          "unit",
+          "unit_price",
+          "net",
+          "tax_rate",
+          "tax"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "line_no": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "source_line_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "code",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?$",
+            "description": "a non-negative decimal string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "unit_price": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?$",
+            "description": "a non-negative decimal string"
+          },
+          "net": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?$",
+            "description": "a non-negative decimal string"
+          },
+          "tax_rate": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?$",
+            "description": "a non-negative decimal string"
+          },
+          "tax": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?$",
+            "description": "a non-negative decimal string"
+          }
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "net",
+        "tax",
+        "gross"
+      ],
+      "properties": {
+        "net": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?$",
+          "description": "a non-negative decimal string"
+        },
+        "tax": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?$",
+          "description": "a non-negative decimal string"
+        },
+        "gross": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?$",
+          "description": "a non-negative decimal string"
+        }
+      }
+    },
+    "print": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "template",
+        "template_version",
+        "count"
+      ],
+      "properties": {
+        "template": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "template_version": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "recorded at the first render; every later render uses it"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

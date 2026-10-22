@@ -1,0 +1,262 @@
+openapi: 3.1.0
+info:
+  title: erp/billing user surface
+  version: 3.0.0
+  description: 'Customer invoices for people and the front end. Every route needs a platform access token and the operation
+    in x-operation; what the caller may not see answers 404 (invoices carry the legal entity dimension). Errors are application/problem+json
+    with a reason. Lists page by cursor only (protocol 14). Amounts are decimal strings. Corrections, supplementary invoices,
+    credit notes, prepayment offsets and e-invoices are in the contract but not in this version: they answer CAPABILITY_UNSUPPORTED
+    (D75).'
+paths:
+  /api/billing/invoices:
+    get:
+      operationId: listInvoices
+      x-operation: erp.billing.invoice.read
+      parameters:
+      - name: legal_entity_id
+        in: query
+        schema: &id001
+          type: string
+          format: uuid
+      - name: customer_id
+        in: query
+        schema: *id001
+      - name: order_id
+        in: query
+        schema: *id001
+      - name: state
+        in: query
+        schema:
+          enum:
+          - draft
+          - confirmed
+          - issued
+          - void
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date
+        description: invoice date, inclusive
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date
+      - name: q
+        in: query
+        schema:
+          type: string
+        description: keyword over the number and the customer's name
+      - $ref: '#/components/parameters/cursor'
+      - $ref: '#/components/parameters/limit'
+      responses:
+        '200':
+          description: one page, newest first
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - invoices
+                - next_cursor
+                properties:
+                  invoices:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Invoice'
+                  next_cursor:
+                    type: string
+        default: &id003
+          $ref: '#/components/responses/problem'
+    post:
+      operationId: draftInvoice
+      x-operation: erp.billing.invoice.draft
+      summary: 'Draft an invoice from a sales order: claims the billable quantities and amounts at erp/sales (all the remaining
+        when lines is omitted); needs an Idempotency-Key. A refused claim creates nothing and answers why'
+      parameters:
+      - &id006
+        name: Idempotency-Key
+        in: header
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - order_id
+              properties:
+                order_id: *id001
+                lines: &id004
+                  type: array
+                  minItems: 1
+                  maxItems: 500
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required:
+                    - order_line_id
+                    - quantity
+                    - amount
+                    properties:
+                      order_line_id: *id001
+                      quantity: &id002
+                        $ref: '#/components/schemas/Decimal'
+                      amount: *id002
+      responses:
+        '200':
+          description: the draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        default: *id003
+  /api/billing/invoices/{id}:
+    parameters: &id005
+    - $ref: '#/components/parameters/id'
+    get:
+      operationId: getInvoice
+      x-operation: erp.billing.invoice.read
+      responses:
+        '200':
+          description: the invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        default: *id003
+    patch:
+      operationId: updateDraft
+      x-operation: erp.billing.invoice.draft
+      summary: Lower a draft's quantities and amounts (never above the claim); with version, only that version
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - lines
+              properties:
+                lines: *id004
+                version:
+                  type: integer
+                  minimum: 1
+      responses:
+        '200':
+          description: the draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        default: *id003
+  /api/billing/invoices/{id}/issue:
+    parameters: *id005
+    post:
+      operationId: issueInvoice
+      x-operation: erp.billing.invoice.issue
+      summary: 'Issue a draft: confirm the claim, number it (continuous per legal entity and year), then formalize at the
+        source; an expired claim voids the draft. Needs an Idempotency-Key'
+      parameters:
+      - *id006
+      responses:
+        '200':
+          description: the invoice (issued, or void when the claim had expired)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        default: *id003
+  /api/billing/invoices/{id}/void:
+    parameters: *id005
+    post:
+      operationId: voidInvoice
+      x-operation: erp.billing.invoice.draft
+      summary: Void a draft or confirmed invoice (it never had a number) and release its claim; an issued invoice is refused
+      responses:
+        '200':
+          description: the invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        default: *id003
+  /api/billing/invoices/{id}/print:
+    parameters: *id005
+    post:
+      operationId: printInvoice
+      x-operation: erp.billing.invoice.print
+      summary: 'Render the issued invoice as PDF through infra/print: the first render records the template version and the
+        print data, every later render uses them and is marked as a copy'
+      responses:
+        '200':
+          description: the PDF
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        default: *id003
+  /api/billing/invoices/{id}/corrections:
+    parameters: *id005
+    post:
+      operationId: correctInvoice
+      x-operation: erp.billing.invoice.issue
+      summary: Correct an issued invoice by a credit note or a supplementary invoice (not in this version, CAPABILITY_UNSUPPORTED)
+      parameters:
+      - *id006
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        default: *id003
+components:
+  parameters:
+    id:
+      name: id
+      in: path
+      required: true
+      schema: *id001
+    cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+  responses:
+    problem:
+      description: an error (application/problem+json with reason)
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            required:
+            - reason
+            properties:
+              reason:
+                type: string
+              detail:
+                type: string
+  schemas:
+    Decimal:
+      type: string
+      pattern: ^[0-9]+(\.[0-9]+)?$
+      description: a decimal string
+    Invoice:
+      $ref: events/erp.invoice.changed.v1.schema.json

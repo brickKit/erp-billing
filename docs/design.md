@@ -27,7 +27,7 @@
 | 草稿、已确认、已编号、已作废 | 账单在本组件内的状态（协议 05 的“出账组件本地的草稿”） | `status`：`draft`、`confirmed`、`issued`、`void` |
 | 正式化回报 | 已编号的账单向来源发正式化，直到来源确认 | `formalization`：`pending`、`done` |
 | 账单号 | 按法人、按年连续，编号事务中分配，作废不收回 | `number` |
-| 已出账 | 账单编号时发布的不可遗漏的增量事实，供财务与信用 | `erp.billing.invoice_issued.v1` |
+| 已出账 | 账单编号时发布的不可遗漏的增量事实，供财务与信用 | `erp.invoice.issued.v1` |
 | 更正（冲回）、补差、红字 | 以后（协议 05） | — |
 | 打印快照 | 账单第一次渲染时记下的模板版本与视图模型（已格式化的打印数据）；之后每次渲染都用它，不重新取当前模板、不重新格式化 | `print_template`、`print_version`、`print_data` |
 | 副本 | 第二次及以后渲染的 PDF 标为副本 | `print_count` |
@@ -79,8 +79,8 @@
 | 修改草稿的数量；作废草稿 | 用户面 | `erp.billing.invoice.draft` |
 | 开具（确认认领、编号、正式化） | 用户面 | `erp.billing.invoice.issue` |
 | 账单列表与读取 | 用户面 | `erp.billing.invoice.read` |
-| 取 PDF（调打印渲染；第二次起标为副本） | 用户面 | `erp.billing.invoice.print` |
-| 账单的系统读取 | 系统面 | `erp.billing.system.read` |
+| 取 PDF（`POST …/print`：调打印渲染；第二次起标为副本） | 用户面 | `erp.billing.invoice.print` |
+| 账单的系统读取（`InvoiceService.Read`） | 系统面 | `erp.billing.system.read` |
 | 更正与补差、红字、预收抵扣、电子发票、按序号补取（关账） | — | 以后 |
 
 数据范围：账单的资源带法人维度（值集合）。
@@ -89,8 +89,8 @@
 
 流 `erp.billing`：
 
-- 已出账（`erp.billing.invoice_issued.v1`）：不可遗漏的增量事实（协议 05 的共同规则），事实身份是账单身份；带法人、客户、币种、金额、税额、来源（订单与行）与信用分支所需的订单身份。在编号事务中写入发件表。
-- 账单状态：可覆盖的完整状态事件。
+- 已出账（`erp.invoice.issued.v1`）：不可遗漏的增量事实（协议 05 的共同规则），事实身份是账单身份；带法人、客户、币种、金额、税额、来源（订单与行）与信用分支所需的订单身份。在编号事务中写入发件表。
+- 账单 `erp.invoice.changed.v1`：可覆盖的完整状态事件（也是 `InvoiceService.Read` 的数据）。
 - 以后：更正、预收抵扣行、关账的“已封存”“已解封”。
 
 ## 依赖

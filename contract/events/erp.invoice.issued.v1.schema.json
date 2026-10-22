@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://brickkit.dev/erp-billing/events/erp.invoice.issued.v1.schema.json",
+  "title": "erp.invoice.issued.v1",
+  "description": "An invoice was issued (protocol 05's \"billed\": an incremental fact that must not be missed; fact_id is the invoice ID). Written to the outbox in the numbering transaction. erp/finance forms the receivable from it; erp/credit converts the order's exposure (later).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "fact_id",
+    "number",
+    "legal_entity_id",
+    "customer_id",
+    "currency",
+    "exchange_rate",
+    "source",
+    "order_id",
+    "invoice_date",
+    "lines",
+    "totals",
+    "issued_at"
+  ],
+  "properties": {
+    "fact_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "number": {
+      "type": "string"
+    },
+    "legal_entity_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "customer_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "exchange_rate": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rate",
+            "date",
+            "type"
+          ],
+          "properties": {
+            "rate": {
+              "type": "string",
+              "pattern": "^[0-9]+(\\.[0-9]+)?$",
+              "description": "a non-negative decimal string"
+            },
+            "date": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "the order's snapshot; null in the legal entity's currency"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "sales_order"
+          ],
+          "description": "later: project milestone, contract period"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "order_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uuid",
+      "description": "the sales order whose credit branch is converted"
+    },
+    "invoice_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "lines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "line_no",
+          "source_line_id",
+          "product",
+          "quantity",
+          "unit",
+          "unit_price",
+          "net",
+          "tax_rate",
+          "tax"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "line_no": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "source_line_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "product": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "code",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "code": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            }
+          },
+          "quantity": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?$",
+            "description": "a non-negative decimal string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "unit_price": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?$",
+            "description": "a non-negative decimal string"
+          },
+          "net": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?$",
+            "description": "a non-negative decimal string"
+          },
+          "tax_rate": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?$",
+            "description": "a non-negative decimal string"
+          },
+          "tax": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+)?$",
+            "description": "a non-negative decimal string"
+          }
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "net",
+        "tax",
+        "gross"
+      ],
+      "properties": {
+        "net": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?$",
+          "description": "a non-negative decimal string"
+        },
+        "tax": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?$",
+          "description": "a non-negative decimal string"
+        },
+        "gross": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?$",
+          "description": "a non-negative decimal string"
+        }
+      }
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+// The system surface of erp/billing: the invoice read. Callers use their service identity; it never filters by a user
+// (a component that shows the result to a user trims it by that user's read contract first). The user surface is REST
+// (../../../../../openapi.yaml); the event payloads are ../../../../../events/.
+syntax = "proto3";
+
+package be.erp.billing.v3;
+
+option go_package = "github.com/brickKit/erp-billing/contract/v3/gen/go/be/erp/billing/v3;billingv3";
+
+// InvoiceService reads invoices for other components (later: the facts' catch-up for the period close, protocol 06).
+service InvoiceService {
+  // Read answers each invoice ID with its current data (erp.invoice.changed.v1), at most 500 IDs a call.
+  rpc Read(ReadRequest) returns (ReadResponse);
+}
+
+message ReadRequest {
+  repeated string ids = 1;
+}
+
+enum ReadState {
+  READ_STATE_UNSPECIFIED = 0;
+  READ_STATE_EXISTS = 1;
+  READ_STATE_NOT_FOUND = 2;
+}
+
+message ReadResult {
+  string id = 1;
+  ReadState state = 2;
+  int64 version = 3;
+  // the canonical JSON of the invoice: the payload of erp.invoice.changed.v1
+  bytes data = 4;
+}
+
+message ReadResponse {
+  repeated ReadResult results = 1;
+}
