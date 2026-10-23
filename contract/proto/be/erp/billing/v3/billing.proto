@@ -27,7 +27,7 @@ message ReadResult {
   string id = 1;
   ReadState state = 2;
   int64 version = 3;
-  // the canonical JSON of the invoice: the payload of erp.invoice.changed.v1
+  // the invoice as JSON: the payload of erp.invoice.changed.v1; plain JSON, not the canonical encoding
   bytes data = 4;
 }
 

@@ -123,7 +123,7 @@ type ReadResult struct {
 	Id      string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	State   ReadState              `protobuf:"varint,2,opt,name=state,proto3,enum=be.erp.billing.v3.ReadState" json:"state,omitempty"`
 	Version int64                  `protobuf:"varint,3,opt,name=version,proto3" json:"version,omitempty"`
-	// the canonical JSON of the invoice: the payload of erp.invoice.changed.v1
+	// the invoice as JSON: the payload of erp.invoice.changed.v1; plain JSON, not the canonical encoding
 	Data          []byte `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
