@@ -15,6 +15,7 @@
 | `billing/lists.go` | 账单列表 |
 | `billing/records.go` | 记录的类型、读取的 SQL、“已出账”事实的载荷 |
 | `billing/migrations/` | 表 |
+| `cmd/seed/` | 种子：角色与授予、从订单草拟、作废、开具的账单，每个法人前几张的打印（`make seed`） |
 | `contract/` | 本组件发布的契约，单独的模块：`contract/proto/`、`contract/events/`、`contract/openapi.yaml` |
 | `docs/` | 设计与出账的顺序 |
 
