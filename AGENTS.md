@@ -23,7 +23,7 @@
 | --- | --- | --- |
 | 账单的状态与开具的顺序 | `docs/design.md` 的状态表、`docs/flows/billing.md` | `issue.go`；集成测试的 `draftAndIssue`、`voidAndExpiry`、`recovery` |
 | 账单号的格式或序列 | `docs/design.md` 的规则要点 | `issue.go` 的 `number` |
-| 打印的数据（视图模型） | `docs/design.md` 的“打印” | `print.go` 的 `viewModel`；打印组件的发票模板要同步 |
+| 打印的数据（视图模型） | `docs/design.md` 的“打印” | `print.go` 的 `viewModel`；打印组件随带的发票模板同步改：视图模型的 JSON Schema（不允许多出的字段）与 Typst 版式，见它的 `AGENTS.md`；两个组件各升版本，本组件依赖打印的新版本 |
 | 加字段、加接口、改事件 | 装配项目 be-assembly-standard 规范里的“改动配方” | `docs/design.md` 的数据与命令 |
 
 ## 构建与测试
