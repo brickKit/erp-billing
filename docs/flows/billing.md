@@ -15,26 +15,7 @@
 
 ## 开具
 
-```mermaid
-sequenceDiagram
-    participant U as 用户
-    participant B as erp/billing
-    participant O as mdm/org
-    participant S as erp/sales
-    U->>B: 开具（Idempotency-Key）
-    B->>S: 确认认领 k
-    alt 已到期
-        S-->>B: 拒绝
-        B->>B: 事务：draft → void（不编号）
-    else 已确认
-        B->>B: 事务：draft → confirmed
-        B->>O: 读法人（事务外取证）
-        B->>B: 编号事务：锁账单；仍是 confirmed；NextNumber；issued；发件表“已出账”
-        B->>S: 正式化 k（按实际数量）
-        S-->>B: 已出账
-        B->>B: 事务：正式化回报 done
-    end
-```
+顺序：用户开具（`Idempotency-Key`）→ 向 `erp/sales` 确认认领 k。已到期时来源拒绝，事务把 `draft` 转为 `void`（不编号），结束；已确认时事务把 `draft` 转为 `confirmed` → 事务外向 `mdm/org` 读法人取证 → 编号事务：锁账单，仍是 `confirmed` 才 `NextNumber`，转 `issued`，发件表写“已出账” → 向 `erp/sales` 按实际数量正式化 k，来源答“已出账”后，事务记正式化回报 `done`。
 
 | 步骤 | 失败或结果未知 |
 | --- | --- |
