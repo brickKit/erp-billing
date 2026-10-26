@@ -17,7 +17,7 @@ import (
 // Identity.
 const (
 	ID       = "erp/billing"
-	Version  = "3.0.6"
+	Version  = "3.0.7"
 	GRPCPort = 9089
 )
 
