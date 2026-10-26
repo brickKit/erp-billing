@@ -4,7 +4,7 @@ kind: Component
 metadata:
   id: erp/billing
   name: Billing
-  version: 3.0.5
+  version: 3.0.6
   description: "Customer invoices: drafts that claim the billable ledger of erp/sales (protocol 05), numbering continuous per legal entity and year, the invoiced fact for finance and credit, and the print snapshot that keeps every reprint the same"
   repository: https://github.com/brickKit/erp-billing
 
@@ -168,3 +168,6 @@ configSchema:
     - PG_SCHEMA
     - PG_USER
   type: object
+
+release:
+  goModule: true
