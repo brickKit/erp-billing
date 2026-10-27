@@ -3,7 +3,7 @@ module github.com/brickKit/erp-billing/v3
 go 1.27.0
 
 require (
-	github.com/brickKit/be-sdk-go/v3 v3.0.0-alpha.34
+	github.com/brickKit/be-sdk-go/v3 v3.0.0-alpha.35
 	github.com/brickKit/erp-billing/contract/v3 v3.0.0-alpha.1
 	github.com/brickKit/erp-sales/contract/v3 v3.0.0-alpha.1
 	github.com/brickKit/infra-print/contract/v3 v3.0.0-alpha.1
