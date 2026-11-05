@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/brickKit/be-sdk-go/v3/audit"
 	"github.com/brickKit/be-sdk-go/v3/bizdate"
 	"github.com/brickKit/be-sdk-go/v3/calls"
 	"github.com/brickKit/be-sdk-go/v3/db"
@@ -121,7 +122,8 @@ func (m *Module) number(ctx context.Context, tx db.Tx, id string, le legalEntity
 	if err != nil {
 		return err
 	}
-	n, err := db.NextNumber(ctx, tx, db.Series{LegalEntity: le.ID, Code: "INV", Period: date[:4]})
+	series := db.Series{LegalEntity: le.ID, Code: "INV", Period: date[:4]}
+	n, err := db.NextNumber(ctx, tx, series)
 	if err != nil {
 		return err
 	}
@@ -131,7 +133,8 @@ func (m *Module) number(ctx context.Context, tx db.Tx, id string, le legalEntity
 		updated_at = now() WHERE id = $1`, id, number, date, search.Text(number, v.Customer.Name), search.Version); err != nil {
 		return err
 	}
-	if v, err = m.emitInvoice(ctx, tx, id, actor, OpIssue); err != nil {
+	// the audit names the number issued: after a full recovery the tool raises the series past it (P14.5)
+	if v, err = m.emitInvoice(ctx, tx, id, actor, OpIssue, map[string]any{"document_number": audit.DocumentNumber(series, n)}); err != nil {
 		return err
 	}
 	if err := m.emit(ctx, tx, InvoiceIssued, v.ID, 1, v.LegalEntityID, issuedFact(v)); err != nil {

@@ -2,6 +2,7 @@ package billing
 
 import (
 	"context"
+	"maps"
 	"regexp"
 	"strconv"
 	"time"
@@ -130,10 +131,15 @@ func decimal(field, v string, scale int32) (string, error) {
 	return d.Text('f'), nil
 }
 
-// change records the business change with the record's new state (protocol 03), in the transaction that made it.
-func (m *Module) change(ctx context.Context, tx db.Tx, actor, op, id string, after any) error {
+// change records the business change with the record's new state (protocol 03), in the transaction that made it;
+// more adds entries to the changes (the issued number, be-protocol P14.5).
+func (m *Module) change(ctx context.Context, tx db.Tx, actor, op, id string, after any, more ...map[string]any) error {
+	changes := map[string]any{"after": after}
+	for _, extra := range more {
+		maps.Copy(changes, extra)
+	}
 	_, err := m.rt.Audit.Write(ctx, tx, audit.Record{Category: audit.BusinessChange, Operation: op, Outcome: audit.Succeeded,
-		Actor: actor, Target: audit.TargetOf(Invoices, id, after), Changes: map[string]any{"after": after}})
+		Actor: actor, Target: audit.TargetOf(Invoices, id, after), Changes: changes})
 	return err
 }
 

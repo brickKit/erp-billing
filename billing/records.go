@@ -171,7 +171,7 @@ func (m *Module) invoice(ctx context.Context, id string) (Invoice, error) {
 }
 
 // emitInvoice publishes an invoice's state after its rows changed and records the change.
-func (m *Module) emitInvoice(ctx context.Context, tx db.Tx, id, actor, op string) (Invoice, error) {
+func (m *Module) emitInvoice(ctx context.Context, tx db.Tx, id, actor, op string, more ...map[string]any) (Invoice, error) {
 	v, err := getInvoice(ctx, tx, id, false)
 	if err != nil {
 		return v, err
@@ -179,7 +179,7 @@ func (m *Module) emitInvoice(ctx context.Context, tx db.Tx, id, actor, op string
 	if err := m.emit(ctx, tx, InvoiceChanged, v.ID, v.Version, v.LegalEntityID, v); err != nil {
 		return v, err
 	}
-	return v, m.change(ctx, tx, actor, op, v.ID, v)
+	return v, m.change(ctx, tx, actor, op, v.ID, v, more...)
 }
 
 // issuedFact is erp.invoice.issued.v1: the fact finance and credit must not miss.

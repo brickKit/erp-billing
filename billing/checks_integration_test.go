@@ -4,8 +4,10 @@ package billing
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -91,6 +93,13 @@ func (fx *fixture) recoveryChecks() {
 	t := fx.t
 	inv := fx.first["id"].(string)
 	t.Run("recovery checks", func(t *testing.T) { checksStory(t, fx.w, fx.admin, Invoices, inv) })
+
+	// the numbering's audit (one of the issue's three) names the number it took (P14.5)
+	var number, issuedNo string
+	require.NoError(t, fx.admin.QueryRow(fx.ctx, "SELECT changes->'document_number'->>'number', number FROM "+itSchema+
+		".be_audit_log l JOIN "+itSchema+".invoice i ON i.id::text = l.target->>'id' WHERE l.operation = $1 AND i.id = $2 "+
+		"AND l.changes ? 'document_number'", OpIssue, inv).Scan(&number, &issuedNo))
+	assert.True(t, strings.HasSuffix(issuedNo, fmt.Sprintf("-%06s", number)), "%s names %s", issuedNo, number)
 
 	base := fx.claims()
 	require.Equal(t, "pass", base.GetOutcome(), "after the flows the invoices and the source agree: %v", base.GetDifferences())
