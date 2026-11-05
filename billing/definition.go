@@ -17,7 +17,7 @@ import (
 // Identity.
 const (
 	ID       = "erp/billing"
-	Version  = "3.0.23"
+	Version  = "3.0.24"
 	GRPCPort = 9089
 )
 
@@ -39,12 +39,15 @@ const (
 
 // Resources and operations (contract/openapi.yaml names each route's operation).
 const (
-	Invoices  = "erp.billing.invoice"
-	OpRead    = "erp.billing.invoice.read"
-	OpDraft   = "erp.billing.invoice.draft"
-	OpIssue   = "erp.billing.invoice.issue"
-	OpPrint   = "erp.billing.invoice.print"
-	System    = "erp.billing.system"
+	Invoices = "erp.billing.invoice"
+	OpRead   = "erp.billing.invoice.read"
+	OpDraft  = "erp.billing.invoice.draft"
+	OpIssue  = "erp.billing.invoice.issue"
+	OpPrint  = "erp.billing.invoice.print"
+	System   = "erp.billing.system"
+	// OpResend is the redelivery of this component's stream (be-protocol P6.38: every component with streams serves
+	// it; any component of the deployment may call it).
+	OpResend  = "erp.billing.system.resend"
 	OpSysRead = "erp.billing.system.read"
 )
 
@@ -103,12 +106,13 @@ func Definitions() *sdkauthz.Definitions {
 			op(OpIssue, "action", true),
 			op(OpPrint, "action", true),
 			{Key: OpSysRead, ResourceType: System, Purpose: "read", RiskClass: "low"},
+			{Key: OpResend, ResourceType: System, Purpose: "read", RiskClass: "low"},
 		}}
 }
 
 // Definition is the component as the launcher and the shells take it.
 func Definition() component.Definition {
 	return component.Definition{ID: ID, Version: Version, Migrations: migrations(), GRPCPort: GRPCPort,
-		Streams: []events.Stream{{Name: Stream, Partitions: 4}}, Authz: Definitions(),
+		Streams: []events.Stream{{Name: Stream, Partitions: 4}}, Authz: Definitions(), Resend: OpResend,
 		New: func(rt *runtime.Runtime) (component.Module, error) { return New(rt) }}
 }
