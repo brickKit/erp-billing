@@ -111,6 +111,8 @@
 
 ## 实现状态
 
+3.0.26（底层先行第 4 项 T9 的级联）：be-sdk-go alpha.87（重放、恢复阶段 `replaying`、转发器停止时放弃租约）；清单的 `RECOVERY_PHASE` 加 `replaying`。依赖：erp/sales@3.0.25 → erp/sales@3.0.26 mdm/currency@3.0.17 → mdm/currency@3.0.18 mdm/org@3.0.17 → mdm/org@3.0.19 mdm/partner@3.0.21 → mdm/partner@3.0.22。
+
 3.0.24（底层先行第 4 项 T8 的级联）：be-sdk-go alpha.81（恢复模式、补发与消费者进度）；流的补发（`be.source.v1.ResendService`，操作 `erp.billing.system.resend`，登记在本组件的 system 资源下，部署内任何组件可调用，线协议 P6.38）；清单声明 `RECOVERY_PHASE`。
 
 实验第 7 步：从销售订单草拟（认领）、修改与作废草稿、开具（确认、编号、正式化及其恢复）、账单查询、已出账与账单状态事件、取 PDF（按需渲染，不保存）。答“能力不支持”的：更正与补差、红字、预收抵扣、电子发票、按序号补取（协议 06）、项目与合同来源。
