@@ -84,6 +84,7 @@ func TestBillingEndToEnd(t *testing.T) {
 	fx.printing()
 	fx.listsAndScope()
 	fx.outbox()
+	fx.recoveryChecks()
 }
 
 func start(t *testing.T) *fixture {

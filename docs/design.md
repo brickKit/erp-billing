@@ -111,6 +111,8 @@
 
 ## 实现状态
 
+3.0.27（底层先行第 4 项 T10 的级联）：be-sdk-go alpha.92。整套恢复的核对（`CheckService`，操作 `erp.billing.system.recover`，只许恢复工具调用）：SDK 自带的三项检查；账单按版本答“还在不在”；业务变更的审计 `target` 带变更之后的版本（`audit.TargetOf`）。协议 05 的检查 `erp.billing.claims`（本组件是认领方，替两边报告，`recoverycheck.go`）：正式化中的账单列为差异（开放后由正式化作业推进）；未结清或最近 30 天动过的账单所属的订单，逐行对来源的台账（`Ledger`，在事务之外问）：已出账要等于已正式化账单的合计，已认领要在“已确认与开具未正式化的合计”与“再加草稿”之间（草稿的认领会到期），本库有而订单没有的行也列出；问不到答“无法证明”。连续单号 `INV` 被恢复提升时，跨过的号逐个登记作废（迁移 0002 的 `voided_number`，显示为 `INV-<法人代码>-<期间>-<号>`；查询的路由还没有，见未决问题）。清单的 `RECOVERY_PHASE` 加 `verifying`、`read_only`；依赖换到 T10 的新版本。
+
 3.0.26（底层先行第 4 项 T9 的级联）：be-sdk-go alpha.87（重放、恢复阶段 `replaying`、转发器停止时放弃租约）；清单的 `RECOVERY_PHASE` 加 `replaying`。依赖：erp/sales@3.0.25 → erp/sales@3.0.26 mdm/currency@3.0.17 → mdm/currency@3.0.18 mdm/org@3.0.17 → mdm/org@3.0.19 mdm/partner@3.0.21 → mdm/partner@3.0.22。
 
 3.0.24（底层先行第 4 项 T8 的级联）：be-sdk-go alpha.81（恢复模式、补发与消费者进度）；流的补发（`be.source.v1.ResendService`，操作 `erp.billing.system.resend`，登记在本组件的 system 资源下，部署内任何组件可调用，线协议 P6.38）；清单声明 `RECOVERY_PHASE`。

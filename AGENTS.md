@@ -14,6 +14,7 @@
 | `billing/print.go` | 打印快照（第一次渲染记下模板版本与视图模型）、视图模型的格式化（千分位、百分比、金额大写） |
 | `billing/lists.go` | 账单列表 |
 | `billing/records.go` | 记录的类型、读取的 SQL、“已出账”事实的载荷 |
+| `billing/checks.go`、`billing/recoverycheck.go` | 整套恢复的核对（线协议第 14 章）：账单按版本答“还在不在”；协议 05 的检查 `erp.billing.claims`（本库的账单对来源的台账，问来源在事务之外）；`INV` 提升跨过的号登记作废（`voided_number`） |
 | `billing/migrations/` | 表 |
 | `cmd/seed/` | 种子：角色与授予、从订单草拟、作废、开具的账单，每个法人前几张的打印（`make seed`） |
 | `contract/` | 本组件发布的契约，单独的模块：`contract/proto/`、`contract/events/`、`contract/openapi.yaml` |

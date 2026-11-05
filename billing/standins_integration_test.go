@@ -177,6 +177,9 @@ func (s *salesStandIn) Read(_ context.Context, in *salesv3.ReadRequest) (*salesv
 func (s *salesStandIn) Ledger(_ context.Context, in *salesv3.LedgerRequest) (*salesv3.LedgerResponse, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if _, err := s.gate("ledger"); err != nil {
+		return nil, err
+	}
 	out := &salesv3.LedgerResponse{OrderId: in.GetOrderId(), OrderState: "confirmed"}
 	for _, l := range s.orders[in.GetOrderId()]["lines"].([]map[string]any) {
 		g := s.ledger[l["id"].(string)]

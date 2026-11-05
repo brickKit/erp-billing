@@ -133,7 +133,7 @@ func decimal(field, v string, scale int32) (string, error) {
 // change records the business change with the record's new state (protocol 03), in the transaction that made it.
 func (m *Module) change(ctx context.Context, tx db.Tx, actor, op, id string, after any) error {
 	_, err := m.rt.Audit.Write(ctx, tx, audit.Record{Category: audit.BusinessChange, Operation: op, Outcome: audit.Succeeded,
-		Actor: actor, Target: map[string]any{"type": Invoices, "id": id}, Changes: map[string]any{"after": after}})
+		Actor: actor, Target: audit.TargetOf(Invoices, id, after), Changes: map[string]any{"after": after}})
 	return err
 }
 
