@@ -4,16 +4,16 @@ kind: Component
 metadata:
   id: erp/billing
   name: Billing
-  version: 3.0.40
+  version: 3.0.41
   description: "Customer invoices: drafts that claim the billable ledger of erp/sales (protocol 05), numbering continuous per legal entity and year, the invoiced fact for finance and credit, and the print snapshot that keeps every reprint the same"
   repository: https://github.com/brickKit/erp-billing
 
 dependencies:
   components:
-    - mdm/currency@3.0.30
-    - mdm/org@3.0.31
-    - mdm/partner@3.0.34
-    - id: erp/sales@3.0.41
+    - mdm/currency@3.0.31
+    - mdm/org@3.0.32
+    - mdm/partner@3.0.35
+    - id: erp/sales@3.0.42
       optional: true
     - id: infra/print@3.0.14
       optional: true
