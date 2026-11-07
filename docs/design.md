@@ -45,20 +45,37 @@
 
 ## 账单的状态
 
-照协议 05 的“出账组件本地的草稿”，按行序第一条命中：
+账单的生命周期是一张表：每个**阶段**（存下的状态 `state`，外加“已编号且正式化已完成”的 `formalized`：存下的是 `issued` 与 `formalization = done`）× 每个**命令**一格，格里写这个命令在这个阶段做什么与规则编号。代码里是同一张表（`internal/invoices/lifecycle.go`），单元测试逐格比较这里与代码，不一致就失败；加一个状态或命令，就是加一列或一行，每一格都要定下来。照协议 05 的“出账组件本地的草稿”。
 
-| 当前状态 | 事件 | 结果状态 | 动作 |
+起草：认领成功得到 `draft`（`formalization = none`）；认领被拒不建账单，回答来源的原因（BL01）。
+
+格的写法：`允许`（照常做，阶段不变）、`拒绝`（文字在代码的表里，答 `STATE_CONFLICT`）、`忽略`（什么也不做，照已做完回答）、`→ <阶段>`（做完账单变成这个阶段，经 `Transition` 写、发账单事件、审计）、`经认领的确认`（先请来源确认认领，结果再按“认领确认”“认领到期”两行）。
+
+| 命令 | `draft` | `confirmed` | `issued` | `formalized` | `void` |
+| --- | --- | --- | --- | --- | --- |
+| 修改 `change` | 允许 IN01 | 拒绝 IN01 | 拒绝 IN01 | 拒绝 IN01 | 拒绝 IN01 |
+| 作废 `void` | → `void` IN02 | → `void` IN02 | 拒绝 IN02 | 拒绝 IN02 | 忽略 IN02 |
+| 开具请求 `issue` | 经认领的确认 IN03 | 允许 IN03 | 忽略 IN03 | 忽略 IN03 | 拒绝 IN03 |
+| 认领确认 `claim_confirmed` | → `confirmed` IN04 | 忽略 IN04 | 忽略 IN04 | 忽略 IN04 | 忽略 IN04 |
+| 认领到期 `claim_expired` | → `void` IN05 | 忽略 IN05 | 忽略 IN05 | 忽略 IN05 | 忽略 IN05 |
+| 编号 `number` | 拒绝 IN06 | → `issued` IN06 | 忽略 IN06 | 忽略 IN06 | 拒绝 IN06 |
+| 正式化 `formalize` | 忽略 IN07 | 忽略 IN07 | → `formalized` IN07 | 忽略 IN07 | 忽略 IN07 |
+| 打印 `print` | 拒绝 IN08 | 拒绝 IN08 | 允许 IN08 | 允许 IN08 | 拒绝 IN08 |
+| 继续作业 `continue` | 忽略 IN09 | 允许 IN09 | 忽略 IN09 | 忽略 IN09 | 忽略 IN09 |
+
+规则目录（账单的生命周期；跨组件的规则用协议 05 的 BL 编号）：
+
+| 规则 | 内容 | 代码 | 测试 |
 | --- | --- | --- | --- |
-| （无） | 草拟（认领成功） | `draft` | — |
-| （无） | 草拟（认领被拒） | — | 不建账单，回答来源的原因 |
-| `draft` | 修改数量（只减不增） | `draft` | 认领不变；正式化时按实际数量 |
-| `draft` | 用户作废 | `void` | 本地提交后向来源释放认领 |
-| `draft` | 来源确认成功 | `confirmed` | — |
-| `draft` | 来源拒绝确认（认领已到期） | `void` | 不编号 |
-| `confirmed` | 编号事务 | `issued` | 正式账单号、“已出账”进发件表；之后向来源发正式化 |
-| `confirmed` | 用户作废 | `void` | 本地提交后才向来源释放认领 |
-| `void` | 编号事务 | `void` | 编号失败 |
-| `issued` | 正式化未确认 | `issued` | 恢复工作项重发正式化，直到来源确认 |
+| IN01 | 只有草稿能修改（只减不增，认领不变；正式化时按实际数量） | `invoices.UpdateInvoice` | `draftAndIssue`、`lifecycle` |
+| IN02 | 草稿与已确认的账单能作废：本地提交后才向来源释放认领，不能反过来（BL25）；已开具的不能作废，只能更正（以后）；作废的再作废照原样回答 | `invoices.VoidInvoice`、`invoices.SetVoid` | `voidAndExpiry`、`lifecycle` |
+| IN03 | 开具请求：草稿先请来源确认认领；已确认的直接编号；已开具的照原样回答（同一个号）；作废的拒绝 | `issue.IssueInvoice` | `draftAndIssue`、`voidAndExpiry`、`lifecycle` |
+| IN04 | 来源确认认领：草稿变成 `confirmed`，同一事务排入继续作业；已确认的认领不会到期（BL21、BL24） | `issue.confirmClaim` | `draftAndIssue`、`recovery` |
+| IN05 | 来源拒绝确认（认领已到期）：草稿作废、不编号，答 `CLAIM_EXPIRED`（BL05、BL26） | `issue.confirmClaim` | `voidAndExpiry` |
+| IN06 | 编号事务只接受已确认的账单：取号、`issued`、开票日期、“已开具”事实与正式化工作项在同一事务；作废的不编号（BL25） | `issue.number` | `draftAndIssue`、`voidAndExpiry` |
+| IN07 | 正式化：告诉来源实际出账的数量与金额，来源确认后记下完成；未确认的由恢复工作项重发直到来源确认（BL04） | `issue.formalize` | `draftAndIssue`、`recovery` |
+| IN08 | 只有已开具的账单能打印 | `print.PrintInvoice` | `printing`、`lifecycle` |
+| IN09 | 继续作业：开具在确认认领之后中断的，等一分钟后接着编号；超过一天仍未编号的告警，不自动作废（协议 05 的状态表允许两种走向，本版选完成编号） | `issue.ContinueJob` | `recovery` |
 
 ## 规则要点
 
@@ -110,6 +127,8 @@
 以后：`erp/tax`（缺时人工税额）、`integration/einvoice-<地区>`、`prj/project`、`erp/contract`。下游：`erp/finance`、`erp/credit`（订阅已出账）。
 
 ## 实现状态
+
+3.0.40：账单的规则集中一处，行为不变：生命周期是一张表（`internal/invoices/lifecycle.go`，与本页“账单的状态”逐格相同，单元测试比较；规则 IN01–IN09），状态与正式化只经 `Transition` 写；入口包的结构检查守住这一条，并登记表以外还读账单状态的地方；新的集成测试步骤 `lifecycle` 锁住业务流程走不到的格；新旧代码跑同一套集成测试，发件表与审计的事件序列相同（装配项目的结构问题 SF04）。
 
 3.0.39：合并安全的单元测试扩到 `internal/` 下全部包（分层以来只查入口包，装配项目的结构问题 SF24）；依赖换到分层之后的版本：`mdm/currency@3.0.30`、`mdm/org@3.0.31`、`mdm/partner@3.0.34`、`erp/sales@3.0.41`。
 

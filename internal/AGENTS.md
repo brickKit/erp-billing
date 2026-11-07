@@ -6,7 +6,7 @@
 
 | 包 | 一句话 | 依赖（本组件内） |
 | --- | --- | --- |
-| `invoices` | 账单草稿：起草、修改、作废、读取、列表 | `core`、`masterdata` |
+| `invoices` | 账单草稿：起草、修改、作废、读取、列表；账单的生命周期（状态唯一的写入） | `core`、`masterdata` |
 | `issue` | 开具：确认认领、编号、正式化 | `core`、`invoices`、`masterdata` |
 | `print` | 打印 | `core`、`invoices`、`masterdata` |
 | `recoverycheck` | 整套恢复后的认领核对、作废的号 | `core`、`invoices`、`masterdata` |
@@ -20,7 +20,8 @@
 - 每个模块的函数先收 `m *core.Base`（组件的运行时），入口包的 `Module` 持有它、登记时适配。
 - 本组件是认领方（装配项目协议 05）：认领、确认、正式化、释放都是调销售的出账来源，在事务之外；本地的状态在事务里写，结果未知的由工作项按同一身份重发。
 - 写入、审计与发件表（`core.Emit`）同一个事务。
+- **规则只在一处**（`billing/structure_test.go` 检查）：账单在哪个阶段能做什么、状态与正式化怎样变，只在 `invoices` 的生命周期表：别的模块 `invoices.PhaseOf` → `invoices.Decide` → 按格行事，变状态只经 `invoices.Transition`；表以外还要读账单状态的（恢复核对），登记在检查的 `invoiceStateReaders` 里，写明用途。
 
 ## 测试
 
-模块的业务规则由 `itest/` 的流程测试覆盖；`print` 有单元测试。
+`invoices` 的生命周期与 `print` 有单元测试；业务流程由 `itest/` 覆盖。

@@ -16,6 +16,7 @@
 | `services.go` | gRPC 方法 `Read` 转给 `internal/invoices` |
 | `checks.go` | 整套恢复的核对：账单按版本答“还在不在”；跨过的号登记作废；协议 05 的认领核对 → `recoverycheck.ClaimsCheck` |
 | `contract_test.go` | 单元测试：清单的 `configSchema` 与 `events`、OpenAPI 与路由一一对应、事件载荷合乎 schema、合并安全 |
+| `structure_test.go` | 单元测试，按类型检查 `internal/`：`internal/invoices/lifecycle.go` 以外不写 `invoice.state` 与 `formalization`，读它们的（Go 或 SQL）都登记在 `invoiceStateReaders`（文件与函数、用途） |
 | `migrations/` | 表 |
 
 ## 依赖与被依赖

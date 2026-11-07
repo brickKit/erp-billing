@@ -12,7 +12,7 @@ import (
 )
 
 // draftAndIssue: all the remaining claimed under the invoice's ID (BL02 on retry), a lowered draft, the issue that
-// confirms, numbers and formalizes with the lowered quantities.
+// confirms, numbers and formalizes with the lowered quantities. Rules IN01, IN03, IN04, IN06, IN07.
 func (fx *fixture) draftAndIssue() {
 	t := fx.t
 	o, goods, _ := fx.order()
@@ -70,7 +70,7 @@ func (fx *fixture) concurrentDrafts() {
 }
 
 // voidAndExpiry: a voided draft releases its claim and takes no number (BL25); an expired claim voids the draft
-// at issue (BL05, BL26); the next number follows on without a gap.
+// at issue (BL05, BL26); the next number follows on without a gap. Rules IN02, IN03, IN05, IN06.
 func (fx *fixture) voidAndExpiry() {
 	t := fx.t
 	o, _, _ := fx.order()

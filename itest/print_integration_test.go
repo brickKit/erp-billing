@@ -11,7 +11,7 @@ import (
 )
 
 // printing: the first render records the template version and view model; a later one uses them, marked as a copy,
-// even after the template changed.
+// even after the template changed; a draft does not print. Rule IN08.
 func (fx *fixture) printing() {
 	t := fx.t
 	id := fx.first["id"].(string)

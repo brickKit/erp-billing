@@ -40,12 +40,12 @@ func IssueInvoice(m *core.Base, c *httpx.Context) error {
 	if err != nil {
 		return err
 	}
-	switch cur.State {
-	case "issued":
+	switch d := invoices.Decide(invoices.PhaseOf(cur), invoices.Issue); d.Effect {
+	case invoices.Ignore:
 		return c.JSON(200, cur)
-	case "void":
-		return core.ErrState.New("the invoice is void")
-	case "draft":
+	case invoices.Refuse:
+		return invoices.Refused(d, cur)
+	case invoices.Process:
 		if err := confirmClaim(m, ctx, cur.ID, actor); err != nil {
 			return err
 		}
@@ -79,22 +79,26 @@ func confirmClaim(m *core.Base, ctx context.Context, id, actor string) error {
 	expired := false
 	err = m.RT.DB.Tx(ctx, func(ctx context.Context, tx db.Tx) error {
 		v, err := core.GetInvoice(ctx, tx, id, true)
-		if err != nil || v.State != "draft" {
+		if err != nil {
 			return err
 		}
+		answer := invoices.ClaimConfirmed
 		if !res.GetConfirmed() {
+			answer = invoices.ClaimExpired
+		}
+		d := invoices.Decide(invoices.PhaseOf(v), answer)
+		switch {
+		case d.Effect == invoices.Ignore:
+			return nil
+		case answer == invoices.ClaimExpired:
 			expired = true
-			_, err := invoices.SetVoid(m, ctx, tx, id, actor)
+			_, err := invoices.SetVoid(m, ctx, tx, v, d, actor)
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE invoice SET state = 'confirmed', version = version + 1, updated_at = now()
-			WHERE id = $1`, id); err != nil {
+		if _, err := invoices.Transition(m, ctx, tx, v, d, nil, actor); err != nil {
 			return err
 		}
-		if _, err := m.RT.Work.Enqueue(ctx, tx, core.JobContinue, invoices.InvoiceArgs{ID: id}); err != nil {
-			return err
-		}
-		_, err = core.EmitInvoice(m, ctx, tx, id, actor, core.OpIssue)
+		_, err = m.RT.Work.Enqueue(ctx, tx, core.JobContinue, invoices.InvoiceArgs{ID: id})
 		return err
 	})
 	if err == nil && expired {
@@ -111,13 +115,12 @@ func number(m *core.Base, ctx context.Context, tx db.Tx, id string, le masterdat
 	if err != nil {
 		return err
 	}
-	switch v.State {
-	case "issued":
+	d := invoices.Decide(invoices.PhaseOf(v), invoices.Number)
+	switch d.Effect {
+	case invoices.Ignore:
 		return nil
-	case "void":
-		return core.ErrState.New("the invoice was voided: it takes no number")
-	case "draft":
-		return core.ErrState.New("the invoice's claim is not confirmed yet")
+	case invoices.Refuse:
+		return invoices.Refused(d, v)
 	}
 	date, err := bizdate.Today(le.Timezone)
 	if err != nil {
@@ -129,13 +132,10 @@ func number(m *core.Base, ctx context.Context, tx db.Tx, id string, le masterdat
 		return err
 	}
 	number := fmt.Sprintf("INV-%s-%s-%06d", le.Code, date[:4], n)
-	if _, err := tx.Exec(ctx, `UPDATE invoice SET state = 'issued', number = $2, invoice_date = $3::date,
-		formalization = 'pending', issued_at = now(), search = $4, search_version = $5, version = version + 1,
-		updated_at = now() WHERE id = $1`, id, number, date, search.Text(number, v.Customer.Name), search.Version); err != nil {
-		return err
-	}
 	// the audit names the number issued: after a full recovery the tool raises the series past it (P14.5)
-	if v, err = core.EmitInvoice(m, ctx, tx, id, actor, core.OpIssue, map[string]any{"document_number": audit.DocumentNumber(series, n)}); err != nil {
+	if v, err = invoices.Transition(m, ctx, tx, v, d, &invoices.Numbered{Number: number, InvoiceDate: date,
+		Search: search.Text(number, v.Customer.Name), SearchVersion: search.Version}, actor,
+		map[string]any{"document_number": audit.DocumentNumber(series, n)}); err != nil {
 		return err
 	}
 	if err := core.Emit(m, ctx, tx, core.InvoiceIssued, v.ID, 1, v.LegalEntityID, core.IssuedFact(v)); err != nil {
@@ -149,7 +149,7 @@ func number(m *core.Base, ctx context.Context, tx db.Tx, id string, le masterdat
 // it is done; formalizing again is harmless at the source.
 func formalize(m *core.Base, ctx context.Context, id string) error {
 	v, err := core.ReadInvoice(m, ctx, id)
-	if err != nil || v.Formalization != "pending" {
+	if err != nil || invoices.Decide(invoices.PhaseOf(v), invoices.Formalize).Effect == invoices.Ignore {
 		return err
 	}
 	src, err := masterdata.Source(m)
@@ -164,12 +164,15 @@ func formalize(m *core.Base, ctx context.Context, id string) error {
 		return err
 	}
 	return m.RT.DB.Tx(ctx, func(ctx context.Context, tx db.Tx) error {
-		tag, err := tx.Exec(ctx, `UPDATE invoice SET formalization = 'done', version = version + 1, updated_at = now()
-			WHERE id = $1 AND formalization = 'pending'`, id)
-		if err != nil || tag.RowsAffected() == 0 {
+		v, err := core.GetInvoice(ctx, tx, id, true)
+		if err != nil {
 			return err
 		}
-		_, err = core.EmitInvoice(m, ctx, tx, id, core.ID, core.OpIssue)
+		d := invoices.Decide(invoices.PhaseOf(v), invoices.Formalize)
+		if d.Effect == invoices.Ignore { // formalized meanwhile
+			return nil
+		}
+		_, err = invoices.Transition(m, ctx, tx, v, d, nil, core.ID)
 		return err
 	})
 }
@@ -190,16 +193,19 @@ func ContinueJob(m *core.Base, ctx context.Context, r *work.Run) error {
 	if err := json.Unmarshal(r.Args, &a); err != nil {
 		return work.Permanent(err)
 	}
-	var state string
+	var cur core.Invoice
 	var age time.Duration
 	err := m.RT.DB.BackgroundTx(ctx, func(ctx context.Context, tx db.Tx) error {
+		var err error
+		if cur, err = core.GetInvoice(ctx, tx, a.ID, false); err != nil {
+			return err
+		}
 		var secs float64
-		err := tx.QueryRow(ctx, `SELECT state, extract(epoch FROM now() - updated_at) FROM invoice WHERE id = $1`,
-			a.ID).Scan(&state, &secs)
+		err = tx.QueryRow(ctx, `SELECT extract(epoch FROM now() - updated_at) FROM invoice WHERE id = $1`, a.ID).Scan(&secs)
 		age = time.Duration(secs * float64(time.Second))
 		return err
 	})
-	if err != nil || state != "confirmed" {
+	if err != nil || invoices.Decide(invoices.PhaseOf(cur), invoices.Continue).Effect == invoices.Ignore {
 		return err
 	}
 	if age < core.ContinueAfter {

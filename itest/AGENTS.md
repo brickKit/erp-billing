@@ -21,6 +21,7 @@
 | `lists_integration_test.go` | `listsAndScope` | 关键字按号找、日期筛选、系统面的读取、别的法人的读者看不见 | `invoices` |
 | `outbox_integration_test.go` | `outbox` | 每个事件合乎 schema；每张开具的账单正好一条“已开具” | 全部发事件的模块 |
 | `recoverycheck_integration_test.go` | `recoveryChecks` | 整套恢复的核对：账单按版本答“还在不在”；协议 05 的认领核对 | 入口 `billing/checks.go`、`recoverycheck` |
+| `lifecycle_integration_test.go` | `lifecycle` | 业务流程走不到的状态格：已确认、已开具（正式化未完成与已完成）、作废的账单拒绝修改；已确认的作废并释放认领；已开具的不能作废；再作废答作废的账单；只有已开具的打印；拒绝的原文逐字锁住 | `invoices`、`issue`、`print` |
 
 共用的：
 

@@ -99,15 +99,16 @@ func ClaimsCheck(m *core.Base, ctx context.Context, read recovery.Read) (recover
 				e = &expected{}
 				orders[src][line] = e
 			}
-			switch {
-			case state == "issued" && formal == "done": // the source recorded what was billed
+			switch invoices.PhaseOfStored(state, formal) {
+			case invoices.Formalized: // the source recorded what was billed
 				e.billed.add(q, a)
-			case state == "confirmed" || state == "issued": // a confirmed claim at the source, never expiring
+			case invoices.Confirmed, invoices.Issued: // a confirmed claim at the source, never expiring
 				e.claimedMin.add(cq, ca)
 				e.claimedMax.add(cq, ca)
-			case state == "draft": // a pending claim, or one that expired
+			case invoices.Draft: // a pending claim, or one that expired
 				e.claimedMax.add(cq, ca)
-			} // void: the claim was released
+			case invoices.Void: // the claim was released
+			}
 		}
 		return rows.Err()
 	})

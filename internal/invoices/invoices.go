@@ -305,9 +305,10 @@ func UpdateInvoice(m *core.Base, c *httpx.Context) error {
 		if err != nil {
 			return err
 		}
+		if d := Decide(PhaseOf(v), Change); d.Effect == Refuse {
+			return Refused(d, v)
+		}
 		switch {
-		case v.State != "draft":
-			return core.ErrState.New("only a draft changes; this invoice is " + v.State)
 		case in.Version != nil && *in.Version != v.Version:
 			return core.ErrVersion.New(fmt.Sprintf("the invoice is at version %d", v.Version))
 		}
@@ -361,17 +362,16 @@ func VoidInvoice(m *core.Base, c *httpx.Context) error {
 		if err != nil {
 			return err
 		}
-		switch v.State {
-		case "void":
+		switch d := Decide(PhaseOf(v), VoidIt); d.Effect {
+		case Ignore:
 			out = v
 			return nil
-		case "issued":
-			return core.ErrState.New("an issued invoice is corrected, never voided")
-		}
-		if out, err = SetVoid(m, ctx, tx, v.ID, actor); err != nil {
+		case Refuse:
+			return Refused(d, v)
+		default:
+			out, err = SetVoid(m, ctx, tx, v, d, actor)
 			return err
 		}
-		return nil
 	})
 	if err != nil {
 		return err
@@ -380,16 +380,15 @@ func VoidInvoice(m *core.Base, c *httpx.Context) error {
 	return c.JSON(200, Fresh(m, ctx, out))
 }
 
-// SetVoid makes an invoice void and enqueues the release of its claim, in one transaction.
-func SetVoid(m *core.Base, ctx context.Context, tx db.Tx, id, actor string) (core.Invoice, error) {
-	if _, err := tx.Exec(ctx, `UPDATE invoice SET state = 'void', version = version + 1, updated_at = now() WHERE id = $1`,
-		id); err != nil {
-		return core.Invoice{}, err
+// SetVoid makes an invoice void (d: a move to void decided for v, the user's void or an expired claim) and enqueues
+// the release of its claim, in one transaction.
+func SetVoid(m *core.Base, ctx context.Context, tx db.Tx, v core.Invoice, d Decision, actor string) (core.Invoice, error) {
+	out, err := Transition(m, ctx, tx, v, d, nil, actor)
+	if err != nil {
+		return out, err
 	}
-	if _, err := m.RT.Work.Enqueue(ctx, tx, core.JobRelease, InvoiceArgs{ID: id}); err != nil {
-		return core.Invoice{}, err
-	}
-	return core.EmitInvoice(m, ctx, tx, id, actor, core.OpDraft)
+	_, err = m.RT.Work.Enqueue(ctx, tx, core.JobRelease, InvoiceArgs{ID: v.ID})
+	return out, err
 }
 
 // Fresh reads the invoice again (a step after the transaction may have changed it), falling back to what we had.

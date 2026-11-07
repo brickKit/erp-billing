@@ -20,7 +20,7 @@
 
 ## 规则在哪
 
-`docs/design.md` 的状态表与规则要点；`docs/flows/billing.md`；装配项目协议 05。
+`docs/design.md` 的“账单的状态”（IN03–IN07、IN09：每一步先问 `invoices.Decide`，状态经 `invoices.Transition` 变）与规则要点；`docs/flows/billing.md`；装配项目协议 05。
 
 ## 测试
 

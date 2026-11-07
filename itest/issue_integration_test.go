@@ -11,6 +11,7 @@ import (
 
 // recovery: BL04, the source does not take the formalize and the work item sends it again; an issue that stopped
 // after confirming (the legal entity was suspended) is numbered by its work item once the legal entity is back.
+// Rules IN04, IN07, IN09.
 func (fx *fixture) recovery() {
 	t := fx.t
 	o, _, _ := fx.order()

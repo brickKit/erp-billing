@@ -28,8 +28,8 @@ func PrintInvoice(m *core.Base, c *httpx.Context) error {
 	if err != nil {
 		return err
 	}
-	if cur.State != "issued" {
-		return core.ErrState.New("only an issued invoice prints; this one is " + cur.State)
+	if d := invoices.Decide(invoices.PhaseOf(cur), invoices.Print); d.Effect == invoices.Refuse {
+		return invoices.Refused(d, cur)
 	}
 	if cur.PrintData == nil {
 		first, err := firstPrint(m, ctx, cur, actor)
