@@ -1,14 +1,15 @@
-package billing
+package invoices
 
 import (
 	sdkauthz "github.com/brickKit/be-sdk-go/v3/authz"
 	"github.com/brickKit/be-sdk-go/v3/httpx"
 	"github.com/brickKit/be-sdk-go/v3/list"
+	core "github.com/brickKit/erp-billing/v3/internal/core"
 )
 
 // The invoice list (protocol 14: cursor pages, newest first; the filters and keyword declared here). Every field is
 // ordinary, so a row is listed whole or not at all; the legal entity dimension compiles into the WHERE.
-var invoiceList = list.Spec{Operation: OpRead, Alias: "i", IDColumn: "id", IDKind: list.UUID,
+var invoiceList = list.Spec{Operation: core.OpRead, Alias: "i", IDColumn: "id", IDKind: list.UUID,
 	Columns: []list.Column{
 		{Field: "created_at", Column: "created_at", Kind: list.Time, Sortable: true},
 		{Field: "legal_entity_id", Column: "legal_entity_id", Kind: list.UUID, Filterable: true},
@@ -18,7 +19,7 @@ var invoiceList = list.Spec{Operation: OpRead, Alias: "i", IDColumn: "id", IDKin
 		{Field: "invoice_date", Column: "invoice_date", Kind: list.Date, Filterable: true}},
 	Search: []list.SearchColumn{{Name: "number_customer", Column: "search", Fields: []string{"number", "customer"}}}}
 
-func (m *Module) listInvoices(c *httpx.Context) error {
+func ListInvoices(m *core.Base, c *httpx.Context) error {
 	var f []list.Filter
 	for param, field := range map[string]string{"legal_entity_id": "legal_entity_id", "customer_id": "customer",
 		"order_id": "source", "state": "state"} {
@@ -26,15 +27,15 @@ func (m *Module) listInvoices(c *httpx.Context) error {
 		if v == "" {
 			continue
 		}
-		if param != "state" && !uuidForm.MatchString(v) {
-			return invalid(param, param+" is an ID")
+		if param != "state" && !core.UUIDForm.MatchString(v) {
+			return core.Invalid(param, param+" is an ID")
 		}
 		f = append(f, list.Filter{Field: field, Op: "eq", Values: []string{v}})
 	}
 	for param, op := range map[string]string{"from": "gte", "to": "lte"} {
 		if v := c.Query(param); v != "" {
-			if !dateForm.MatchString(v) {
-				return invalid(param, param+" is YYYY-MM-DD")
+			if !core.DateForm.MatchString(v) {
+				return core.Invalid(param, param+" is YYYY-MM-DD")
 			}
 			f = append(f, list.Filter{Field: "invoice_date", Op: op, Values: []string{v}})
 		}
@@ -49,8 +50,8 @@ func (m *Module) listInvoices(c *httpx.Context) error {
 	if err != nil {
 		return err
 	}
-	out, next, err := list.Page(ctx, m.rt.DB, q, "invoice", invoiceCols, scanInvoice,
-		func(v Invoice) ([]string, string) { return []string{v.CreatedAt}, v.ID })
+	out, next, err := list.Page(ctx, m.RT.DB, q, "invoice", core.InvoiceCols, core.ScanInvoice,
+		func(v core.Invoice) ([]string, string) { return []string{v.CreatedAt}, v.ID })
 	if err != nil {
 		return err
 	}

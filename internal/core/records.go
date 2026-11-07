@@ -1,4 +1,4 @@
-package billing
+package core
 
 import (
 	"context"
@@ -93,7 +93,7 @@ type Invoice struct {
 	IssuedAt    *time.Time `json:"-"`
 }
 
-const invoiceCols = `i.id::text, i.number, i.legal_entity_id::text, i.customer_id::text, i.customer_name, i.customer_tax_id,
+const InvoiceCols = `i.id::text, i.number, i.legal_entity_id::text, i.customer_id::text, i.customer_name, i.customer_tax_id,
 	i.currency, trim_scale(i.rate)::text, i.rate_date::text, i.rate_type, i.source_kind, i.source_id::text, i.state,
 	i.formalization, i.invoice_date::text, trim_scale(i.net)::text, trim_scale(i.tax)::text, trim_scale(i.net + i.tax)::text,
 	i.print_template, i.print_version, i.print_count, i.print_data, i.print_digest, i.issued_at, i.version, i.created_at,
@@ -105,7 +105,7 @@ const invoiceCols = `i.id::text, i.number, i.legal_entity_id::text, i.customer_i
 		'claimed_qty', trim_scale(l.claimed_qty)::text, 'claimed_amt', trim_scale(l.claimed_amt)::text) ORDER BY l.line_no)
 		FROM invoice_line l WHERE l.invoice_id = i.id), '[]'::jsonb)`
 
-func scanInvoice(row pgx.Row) (Invoice, error) {
+func ScanInvoice(row pgx.Row) (Invoice, error) {
 	var v Invoice
 	var rate, rateDate, rateType *string
 	var created, updated time.Time
@@ -138,52 +138,52 @@ func scanInvoice(row pgx.Row) (Invoice, error) {
 }
 
 // errNone is a lookup that found no row.
-var errNone = errors.New("no such record")
+var ErrNone = errors.New("no such record")
 
-// getInvoice reads an invoice; lock takes the invoice row's lock, the one every change of the invoice takes.
-func getInvoice(ctx context.Context, tx db.Tx, id string, lock bool) (Invoice, error) {
+// GetInvoice reads an invoice; lock takes the invoice row's lock, the one every change of the invoice takes.
+func GetInvoice(ctx context.Context, tx db.Tx, id string, lock bool) (Invoice, error) {
 	if lock {
 		if _, err := tx.Exec(ctx, `SELECT 1 FROM invoice WHERE id = $1::uuid FOR UPDATE`, id); err != nil {
 			return Invoice{}, err
 		}
 	}
-	v, err := scanInvoice(tx.QueryRow(ctx, `SELECT `+invoiceCols+` FROM invoice i WHERE i.id = $1::uuid`, id))
+	v, err := ScanInvoice(tx.QueryRow(ctx, `SELECT `+InvoiceCols+` FROM invoice i WHERE i.id = $1::uuid`, id))
 	if errors.Is(err, pgx.ErrNoRows) {
-		return v, errNone
+		return v, ErrNone
 	}
 	return v, err
 }
 
-func (m *Module) invoice(ctx context.Context, id string) (Invoice, error) {
+func ReadInvoice(m *Base, ctx context.Context, id string) (Invoice, error) {
 	var v Invoice
-	if !uuidForm.MatchString(id) {
-		return v, notFound("invoice")
+	if !UUIDForm.MatchString(id) {
+		return v, NotFound("invoice")
 	}
-	err := m.rt.DB.BackgroundTx(ctx, func(ctx context.Context, tx db.Tx) error {
+	err := m.RT.DB.BackgroundTx(ctx, func(ctx context.Context, tx db.Tx) error {
 		var err error
-		v, err = getInvoice(ctx, tx, id, false)
+		v, err = GetInvoice(ctx, tx, id, false)
 		return err
 	})
-	if errors.Is(err, errNone) {
-		return v, notFound("invoice")
+	if errors.Is(err, ErrNone) {
+		return v, NotFound("invoice")
 	}
 	return v, err
 }
 
-// emitInvoice publishes an invoice's state after its rows changed and records the change.
-func (m *Module) emitInvoice(ctx context.Context, tx db.Tx, id, actor, op string, more ...map[string]any) (Invoice, error) {
-	v, err := getInvoice(ctx, tx, id, false)
+// EmitInvoice publishes an invoice's state after its rows changed and records the change.
+func EmitInvoice(m *Base, ctx context.Context, tx db.Tx, id, actor, op string, more ...map[string]any) (Invoice, error) {
+	v, err := GetInvoice(ctx, tx, id, false)
 	if err != nil {
 		return v, err
 	}
-	if err := m.emit(ctx, tx, InvoiceChanged, v.ID, v.Version, v.LegalEntityID, v); err != nil {
+	if err := Emit(m, ctx, tx, InvoiceChanged, v.ID, v.Version, v.LegalEntityID, v); err != nil {
 		return v, err
 	}
-	return v, m.change(ctx, tx, actor, op, v.ID, v, more...)
+	return v, change(m, ctx, tx, actor, op, v.ID, v, more...)
 }
 
-// issuedFact is erp.invoice.issued.v1: the fact finance and credit must not miss.
-func issuedFact(v Invoice) map[string]any {
+// IssuedFact is erp.invoice.issued.v1: the fact finance and credit must not miss.
+func IssuedFact(v Invoice) map[string]any {
 	return map[string]any{"fact_id": v.ID, "number": *v.Number, "legal_entity_id": v.LegalEntityID,
 		"customer_id": v.Customer.PartnerID, "currency": v.Currency, "exchange_rate": v.ExchangeRate, "source": v.Source,
 		"order_id": v.Source.ID, "invoice_date": *v.InvoiceDate, "lines": v.Lines, "totals": v.Totals,

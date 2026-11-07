@@ -1,9 +1,13 @@
-package billing
+package print
 
 import (
 	"context"
 	"encoding/json"
 	"strings"
+
+	core "github.com/brickKit/erp-billing/v3/internal/core"
+	invoices "github.com/brickKit/erp-billing/v3/internal/invoices"
+	masterdata "github.com/brickKit/erp-billing/v3/internal/masterdata"
 
 	"github.com/brickKit/be-sdk-go/v3/db"
 	"github.com/brickKit/be-sdk-go/v3/httpx"
@@ -15,38 +19,38 @@ import (
 // version and the view model (the print snapshot); every later render passes the same two and is marked as a copy, so
 // a changed template or changed formatting code never changes an old invoice. A failed first render records nothing.
 
-func (m *Module) printInvoice(c *httpx.Context) error {
-	cur, err := m.invoice(c.Ctx(), c.Param("id"))
+func PrintInvoice(m *core.Base, c *httpx.Context) error {
+	cur, err := core.ReadInvoice(m, c.Ctx(), c.Param("id"))
 	if err != nil {
 		return err
 	}
-	ctx, actor, err := check(c, OpPrint, cur.LegalEntityID)
+	ctx, actor, err := core.Check(c, core.OpPrint, cur.LegalEntityID)
 	if err != nil {
 		return err
 	}
 	if cur.State != "issued" {
-		return errState.New("only an issued invoice prints; this one is " + cur.State)
+		return core.ErrState.New("only an issued invoice prints; this one is " + cur.State)
 	}
 	if cur.PrintData == nil {
-		first, err := m.firstPrint(ctx, cur, actor)
+		first, err := firstPrint(m, ctx, cur, actor)
 		if err != nil || first != nil {
 			if err != nil {
 				return err
 			}
 			return c.Bytes(200, first.mediaType, first.content)
 		}
-		cur = m.fresh(ctx, cur) // another request recorded the snapshot first: this one is a copy
+		cur = invoices.Fresh(m, ctx, cur) // another request recorded the snapshot first: this one is a copy
 	}
-	res, err := m.render(ctx, *cur.Print.TemplateVersion, cur.PrintData, true)
+	res, err := masterdata.Render(m, ctx, *cur.Print.TemplateVersion, cur.PrintData, true)
 	if err != nil {
 		return err
 	}
-	if err := m.rt.DB.Tx(ctx, func(ctx context.Context, tx db.Tx) error {
+	if err := m.RT.DB.Tx(ctx, func(ctx context.Context, tx db.Tx) error {
 		if _, err := tx.Exec(ctx, `UPDATE invoice SET print_count = print_count + 1, version = version + 1, updated_at = now()
 			WHERE id = $1`, cur.ID); err != nil {
 			return err
 		}
-		_, err := m.emitInvoice(ctx, tx, cur.ID, actor, OpPrint)
+		_, err := core.EmitInvoice(m, ctx, tx, cur.ID, actor, core.OpPrint)
 		return err
 	}); err != nil {
 		return err
@@ -61,12 +65,12 @@ type rendered struct {
 
 // firstPrint formats the view model, renders the template's current version and records both as the snapshot; nil
 // when another request recorded a snapshot meanwhile.
-func (m *Module) firstPrint(ctx context.Context, v Invoice, actor string) (*rendered, error) {
-	le, err := m.legalEntityOf(ctx, v.LegalEntityID, false)
+func firstPrint(m *core.Base, ctx context.Context, v core.Invoice, actor string) (*rendered, error) {
+	le, err := masterdata.LegalEntityOf(m, ctx, v.LegalEntityID, false)
 	if err != nil {
 		return nil, err
 	}
-	scale, err := m.currencyScale(ctx, v.Currency)
+	scale, err := masterdata.CurrencyScale(m, ctx, v.Currency)
 	if err != nil {
 		return nil, err
 	}
@@ -74,12 +78,12 @@ func (m *Module) firstPrint(ctx context.Context, v Invoice, actor string) (*rend
 	if err != nil {
 		return nil, err
 	}
-	res, err := m.render(ctx, 0, data, false)
+	res, err := masterdata.Render(m, ctx, 0, data, false)
 	if err != nil {
 		return nil, err
 	}
 	recorded := false
-	err = m.rt.DB.Tx(ctx, func(ctx context.Context, tx db.Tx) error {
+	err = m.RT.DB.Tx(ctx, func(ctx context.Context, tx db.Tx) error {
 		tag, err := tx.Exec(ctx, `UPDATE invoice SET print_template = $2, print_version = $3, print_data = $4,
 			print_digest = $5, print_count = 1, version = version + 1, updated_at = now()
 			WHERE id = $1 AND print_data IS NULL`, v.ID, res.GetTemplate(), res.GetVersion(), string(data),
@@ -88,7 +92,7 @@ func (m *Module) firstPrint(ctx context.Context, v Invoice, actor string) (*rend
 			return err
 		}
 		recorded = true
-		_, err = m.emitInvoice(ctx, tx, v.ID, actor, OpPrint)
+		_, err = core.EmitInvoice(m, ctx, tx, v.ID, actor, core.OpPrint)
 		return err
 	})
 	if err != nil || !recorded {
@@ -99,7 +103,7 @@ func (m *Module) firstPrint(ctx context.Context, v Invoice, actor string) (*rend
 
 // viewModel is the invoice template's data, formatted once for Chinese (dates, grouped amounts, rates as percents,
 // the gross amount in capital characters); the template only places it.
-func viewModel(v Invoice, le legalEntity, scale int32) map[string]any {
+func viewModel(v core.Invoice, le masterdata.LegalEntity, scale int32) map[string]any {
 	lines := make([]map[string]any, len(v.Lines))
 	for i, l := range v.Lines {
 		lines[i] = map[string]any{"no": l.LineNo, "code": l.Product.Code, "name": l.Product.Name,
@@ -151,7 +155,7 @@ func grouped(s string, scale int32) string {
 func percent(rate string) string {
 	d, _, _ := apd.NewFromString(rate)
 	var p apd.Decimal
-	_, _ = arith.Mul(&p, d, apd.New(100, 0))
+	_, _ = invoices.Arith.Mul(&p, d, apd.New(100, 0))
 	p.Reduce(&p)
 	return p.Text('f') + "%"
 }

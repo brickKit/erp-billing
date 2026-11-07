@@ -1,6 +1,6 @@
 //go:build integration
 
-package billing
+package itest
 
 // The stand-ins of the integration test, each speaking its published contract: mdm/org, mdm/currency, erp/sales (the
 // order read and the billing source of protocol 05, deciding claims on its ledger as the real source does) and

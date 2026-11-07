@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"os"
 	"testing"
+	"time"
+
+	core "github.com/brickKit/erp-billing/v3/internal/core"
 
 	"github.com/brickKit/be-sdk-go/v3/httpx"
 	"github.com/brickKit/be-sdk-go/v3/launcher"
@@ -45,22 +48,22 @@ func TestThePayloadsFitTheirSchemas(t *testing.T) {
 	at := "2026-10-23T08:00:00.000000Z"
 	number, date, tax, tpl, ver := "INV-SH-2026-000001", "2026-10-23", "91310000MA1", "invoice", int64(2)
 	issued, _ := time_(at)
-	v := Invoice{ID: "01a15ab0-0000-7000-8000-0000000000a1", Number: &number,
+	v := core.Invoice{ID: "01a15ab0-0000-7000-8000-0000000000a1", Number: &number,
 		LegalEntityID: "01a15ab0-0000-7000-8000-0000000000a2",
-		Customer:      Customer{PartnerID: "01a15ab0-0000-7000-8000-0000000000a3", Name: "上海客户", TaxID: &tax},
-		Currency:      "USD", ExchangeRate: &Rate{Rate: "7.1", Date: date, Type: "spot"},
-		Source: Source{Kind: "sales_order", ID: "01a15ab0-0000-7000-8000-0000000000a4"}, State: "issued",
+		Customer:      core.Customer{PartnerID: "01a15ab0-0000-7000-8000-0000000000a3", Name: "上海客户", TaxID: &tax},
+		Currency:      "USD", ExchangeRate: &core.Rate{Rate: "7.1", Date: date, Type: "spot"},
+		Source: core.Source{Kind: "sales_order", ID: "01a15ab0-0000-7000-8000-0000000000a4"}, State: "issued",
 		Formalization: "done", InvoiceDate: &date,
-		Lines: []Line{{ID: "01a15ab0-0000-7000-8000-0000000000a5", LineNo: 1, SourceLineID: "01a15ab0-0000-7000-8000-0000000000a6",
-			Product: Product{ID: "01a15ab0-0000-7000-8000-0000000000a7", Code: "SCREW", Name: "螺丝"}, Quantity: "2",
+		Lines: []core.Line{{ID: "01a15ab0-0000-7000-8000-0000000000a5", LineNo: 1, SourceLineID: "01a15ab0-0000-7000-8000-0000000000a6",
+			Product: core.Product{ID: "01a15ab0-0000-7000-8000-0000000000a7", Code: "SCREW", Name: "螺丝"}, Quantity: "2",
 			Unit: "BX", UnitPrice: "120", Net: "240", TaxRate: "0.13", Tax: "31.2"}},
-		Totals: Totals{Net: "240", Tax: "31.2", Gross: "271.2"}, Print: PrintState{Template: &tpl, TemplateVersion: &ver, Count: 2},
+		Totals: core.Totals{Net: "240", Tax: "31.2", Gross: "271.2"}, Print: core.PrintState{Template: &tpl, TemplateVersion: &ver, Count: 2},
 		Version: 4, CreatedAt: at, UpdatedAt: at, IssuedAt: &issued}
-	validate(t, InvoiceChanged, v)
-	validate(t, InvoiceIssued, issuedFact(v))
-	draft := Invoice{ID: v.ID, LegalEntityID: v.LegalEntityID, Customer: v.Customer, Currency: "CNY", Source: v.Source,
+	validate(t, core.InvoiceChanged, v)
+	validate(t, core.InvoiceIssued, core.IssuedFact(v))
+	draft := core.Invoice{ID: v.ID, LegalEntityID: v.LegalEntityID, Customer: v.Customer, Currency: "CNY", Source: v.Source,
 		State: "draft", Formalization: "none", Lines: v.Lines, Totals: v.Totals, Version: 1, CreatedAt: at, UpdatedAt: at}
-	validate(t, InvoiceChanged, draft)
+	validate(t, core.InvoiceChanged, draft)
 }
 
 func validate(t *testing.T, typ string, v any) {
@@ -82,3 +85,6 @@ func TestTheModuleIsMergeSafe(t *testing.T) {
 		t.Errorf("%v", f)
 	}
 }
+
+// time_ reads an RFC 3339 time (as the print view model takes them).
+func time_(s string) (time.Time, error) { return time.Parse(time.RFC3339Nano, s) }

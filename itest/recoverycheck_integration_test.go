@@ -1,6 +1,6 @@
 //go:build integration
 
-package billing
+package itest
 
 import (
 	"context"
@@ -10,6 +10,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	core "github.com/brickKit/erp-billing/v3/internal/core"
+	recoverycheck "github.com/brickKit/erp-billing/v3/internal/recoverycheck"
 
 	"github.com/brickKit/be-sdk-go/v3/ids"
 	"github.com/brickKit/be-sdk-go/v3/recoverypb"
@@ -29,7 +32,7 @@ import (
 func checksStory(t *testing.T, w *sectest.World, admin *pgx.Conn, typ, id string) {
 	ctx := context.Background()
 	dial := func(as string) recoverypb.CheckServiceClient {
-		conn, err := grpc.NewClient(itSystem, grpc.WithTransportCredentials(credentials.NewTLS(w.TLS(t, as).ClientConfig(ID))))
+		conn, err := grpc.NewClient(itSystem, grpc.WithTransportCredentials(credentials.NewTLS(w.TLS(t, as).ClientConfig(core.ID))))
 		require.NoError(t, err)
 		t.Cleanup(func() { conn.Close() })
 		return recoverypb.NewCheckServiceClient(conn)
@@ -59,7 +62,7 @@ func checksStory(t *testing.T, w *sectest.World, admin *pgx.Conn, typ, id string
 
 // checkService is the recovery tool's client of this member's CheckService.
 func (fx *fixture) checkService() recoverypb.CheckServiceClient {
-	conn, err := grpc.NewClient(itSystem, grpc.WithTransportCredentials(credentials.NewTLS(fx.w.TLS(fx.t, "ops/recover").ClientConfig(ID))))
+	conn, err := grpc.NewClient(itSystem, grpc.WithTransportCredentials(credentials.NewTLS(fx.w.TLS(fx.t, "ops/recover").ClientConfig(core.ID))))
 	require.NoError(fx.t, err)
 	fx.t.Cleanup(func() { conn.Close() })
 	return recoverypb.NewCheckServiceClient(conn)
@@ -71,11 +74,11 @@ func (fx *fixture) claims() *recoverypb.CheckResult {
 	res, err := fx.checkService().Check(fx.ctx, &recoverypb.CheckRequest{Recovery: "r"})
 	require.NoError(fx.t, err)
 	for _, r := range res.GetResults() {
-		if r.GetCheck() == CheckClaims {
+		if r.GetCheck() == recoverycheck.CheckClaims {
 			return r
 		}
 	}
-	fx.t.Fatal("no " + CheckClaims)
+	fx.t.Fatal("no " + recoverycheck.CheckClaims)
 	return nil
 }
 
@@ -92,13 +95,13 @@ func details(r *recoverypb.CheckResult) map[string]string {
 func (fx *fixture) recoveryChecks() {
 	t := fx.t
 	inv := fx.first["id"].(string)
-	t.Run("recovery checks", func(t *testing.T) { checksStory(t, fx.w, fx.admin, Invoices, inv) })
+	t.Run("recovery checks", func(t *testing.T) { checksStory(t, fx.w, fx.admin, core.Invoices, inv) })
 
 	// the numbering's audit (one of the issue's three) names the number it took (P14.5)
 	var number, issuedNo string
 	require.NoError(t, fx.admin.QueryRow(fx.ctx, "SELECT changes->'document_number'->>'number', number FROM "+itSchema+
 		".be_audit_log l JOIN "+itSchema+".invoice i ON i.id::text = l.target->>'id' WHERE l.operation = $1 AND i.id = $2 "+
-		"AND l.changes ? 'document_number'", OpIssue, inv).Scan(&number, &issuedNo))
+		"AND l.changes ? 'document_number'", core.OpIssue, inv).Scan(&number, &issuedNo))
 	assert.True(t, strings.HasSuffix(issuedNo, fmt.Sprintf("-%06s", number)), "%s names %s", issuedNo, number)
 
 	base := fx.claims()

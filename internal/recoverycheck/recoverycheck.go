@@ -1,9 +1,13 @@
-package billing
+package recoverycheck
 
 import (
 	"context"
 	"fmt"
 	"time"
+
+	core "github.com/brickKit/erp-billing/v3/internal/core"
+	invoices "github.com/brickKit/erp-billing/v3/internal/invoices"
+	masterdata "github.com/brickKit/erp-billing/v3/internal/masterdata"
 
 	"github.com/brickKit/be-sdk-go/v3/calls"
 	"github.com/brickKit/be-sdk-go/v3/db"
@@ -20,8 +24,8 @@ const CheckClaims = "erp.billing.claims"
 // settledWindow is how far back an order whose invoices are all settled is compared with the source.
 const settledWindow = 30 * 24 * time.Hour
 
-// voidNumbers registers the INV numbers a full recovery raised the series over (P14.5).
-func voidNumbers(ctx context.Context, tx db.Tx, s db.Series, from, to int64) error {
+// VoidNumbers registers the INV numbers a full recovery raised the series over (P14.5).
+func VoidNumbers(ctx context.Context, tx db.Tx, s db.Series, from, to int64) error {
 	_, err := tx.Exec(ctx, `INSERT INTO voided_number (legal_entity_id, series, period, number, reason)
 		SELECT $1::uuid, $2, $3, n, 'a full recovery lost the invoice issued under this number' FROM generate_series($4::bigint, $5::bigint) n
 		ON CONFLICT DO NOTHING`, s.LegalEntity, s.Code, s.Period, from, to)
@@ -34,8 +38,8 @@ type measure struct{ qty, amt apd.Decimal }
 func (m *measure) add(q, a string) {
 	x, _, _ := apd.NewFromString(q)
 	y, _, _ := apd.NewFromString(a)
-	_, _ = arith.Add(&m.qty, &m.qty, x)
-	_, _ = arith.Add(&m.amt, &m.amt, y)
+	_, _ = invoices.Arith.Add(&m.qty, &m.qty, x)
+	_, _ = invoices.Arith.Add(&m.amt, &m.amt, y)
 }
 
 func (m *measure) String() string { return m.qty.Text('f') + " / " + m.amt.Text('f') }
@@ -53,9 +57,9 @@ func within(gotQ, gotA string, lo, hi *measure) bool {
 	return cmpDec(q, &lo.qty) >= 0 && cmpDec(q, &hi.qty) <= 0 && cmpDec(a, &lo.amt) >= 0 && cmpDec(a, &hi.amt) <= 0
 }
 
-// claimsCheck reads this database's invoices (the orders with an invoice not settled, or touched lately), then asks
+// ClaimsCheck reads this database's invoices (the orders with an invoice not settled, or touched lately), then asks
 // the source for each order's ledger outside any transaction and compares line by line.
-func (m *Module) claimsCheck(ctx context.Context, read recovery.Read) (recovery.Result, error) {
+func ClaimsCheck(m *core.Base, ctx context.Context, read recovery.Read) (recovery.Result, error) {
 	var diffs []recovery.Difference
 	orders := map[string]map[string]*expected{}
 	var order []string
@@ -112,7 +116,7 @@ func (m *Module) claimsCheck(ctx context.Context, read recovery.Read) (recovery.
 	}
 	mismatch, unknown := len(diffs) > 0, false
 	for _, src := range order {
-		ledger, err := m.ledgerOf(ctx, src)
+		ledger, err := ledgerOf(m, ctx, src)
 		if err != nil {
 			unknown = true
 			diffs = append(diffs, recovery.Difference{ObjectType: "sales_order", ObjectID: src,
@@ -162,8 +166,8 @@ func (m *Module) claimsCheck(ctx context.Context, read recovery.Read) (recovery.
 }
 
 // ledgerOf asks the source for an order's ledger.
-func (m *Module) ledgerOf(ctx context.Context, order string) (*salesv3.LedgerResponse, error) {
-	src, err := m.source()
+func ledgerOf(m *core.Base, ctx context.Context, order string) (*salesv3.LedgerResponse, error) {
+	src, err := masterdata.Source(m)
 	if err != nil {
 		return nil, err
 	}
