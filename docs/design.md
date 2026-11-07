@@ -111,6 +111,8 @@
 
 ## 实现状态
 
+3.0.39：合并安全的单元测试扩到 `internal/` 下全部包（分层以来只查入口包，装配项目的结构问题 SF24）；依赖换到分层之后的版本：`mdm/currency@3.0.30`、`mdm/org@3.0.31`、`mdm/partner@3.0.34`、`erp/sales@3.0.41`。
+
 3.0.38：代码按业务模块分层，行为不变：入口包 `billing/` 只组装，业务在 `internal/` 下（`invoices`、`issue`、`print`、`recoverycheck`、`masterdata`、`core`），集成测试在 `itest/`、按业务流程分文件；每个代码目录一份 `AGENTS.md`。
 
 3.0.37：be-sdk-go alpha.116（全系统同一个 SDK 版本；冷热数据：每天的孤儿清理、擦除作废导出、已销毁的记录从决定起答不存在、释放在事务之外读备份记录）
