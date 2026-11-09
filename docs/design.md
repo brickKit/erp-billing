@@ -128,6 +128,8 @@
 
 ## 实现状态
 
+3.0.52：依赖换到 `infra/print` 3.0.24（打印组件换上 be-sdk-python v3.0.0a61；契约不变）。
+
 3.0.51：依赖换到 `infra/print` 3.0.23（打印组件换上 be-sdk-python v3.0.0a60；契约不变）。
 
 3.0.50：依赖换到 `infra/print` 3.0.22（打印组件换上 be-sdk-python v3.0.0a59；契约不变）。
