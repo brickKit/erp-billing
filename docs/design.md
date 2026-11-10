@@ -128,6 +128,8 @@
 
 ## 实现状态
 
+3.0.54：be-sdk-go alpha.121（全系统同一个 SDK 版本；sectest 的授权组件替身答 CheckLinkChange 与 Administrators）
+
 3.0.53：依赖换到 mdm/org 3.0.34（岗位；装配项目阶段计划 C1 的 E0b），行为不变
 
 3.0.52：依赖换到 `infra/print` 3.0.24（打印组件换上 be-sdk-python v3.0.0a61；契约不变）。
